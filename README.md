@@ -164,13 +164,13 @@ be the judgment engine inside two Rust systems —
 [PRECC](https://github.com/peri-a-i/precc-cc), a Claude Code hook that
 saves tokens, and [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal) /
 Local Mind, an on-device DeepSeek-V4 engine — where an in-process,
-KV-forking scorer is the point. See [`docs/DESIGN.md`](docs/DESIGN.md).
+KV-forking scorer is the point.
 
 ## Limits (today)
 
 - At most 26 options per question (single-letter labels); Jev accepts 255.
 - One backend, `llama-server`. In-process llama.cpp and ds4-rs backends are next.
-- Zero-shot only; no RLCD-style training. The recipe is in the design doc.
+- Zero-shot only; no RLCD-style training.
 
 ## License
 

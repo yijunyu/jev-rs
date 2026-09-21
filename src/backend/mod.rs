@@ -4,7 +4,7 @@
 //!
 //! Implemented: [`llamacpp::LlamaServer`] (any GGUF via `llama-server`).
 //! Planned: an in-process ds4-rs-metal session (`AttnStepState` fork per
-//! question), an in-process llama.cpp / ggml-tilers context (`llama_kv_self_seq_cp`).
+//! question), an in-process llama.cpp context (`llama_kv_self_seq_cp`).
 
 pub mod llamacpp;
 pub mod typesafe;

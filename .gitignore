@@ -2,3 +2,5 @@
 *.log
 calibration.json
 rows.jsonl
+# pending publicity review before it is committed
+docs/DESIGN.md
