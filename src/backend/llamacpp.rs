@@ -22,12 +22,20 @@ impl LlamaServer {
     pub fn new(base_url: impl Into<String>) -> Self {
         let base_url = base_url.into().trim_end_matches('/').to_string();
         let model_name = probe_model(&base_url).unwrap_or_else(|| "llama-server".to_string());
-        Self { base_url, n_probs: 40, model_name }
+        Self {
+            base_url,
+            n_probs: 40,
+            model_name,
+        }
     }
 }
 
 fn probe_model(base: &str) -> Option<String> {
-    let v: Value = ureq::get(&format!("{base}/v1/models")).call().ok()?.into_json().ok()?;
+    let v: Value = ureq::get(&format!("{base}/v1/models"))
+        .call()
+        .ok()?
+        .into_json()
+        .ok()?;
     let id = v.get("data")?.get(0)?.get("id")?.as_str()?;
     // llama-server reports the GGUF path; keep the file stem.
     let stem = std::path::Path::new(id).file_stem()?.to_str()?;
@@ -51,7 +59,9 @@ impl Scorer for LlamaServer {
         let resp = ureq::post(&format!("{}/completion", self.base_url))
             .send_json(body)
             .map_err(|e| BackendError::Http(e.to_string()))?;
-        let v: Value = resp.into_json().map_err(|e| BackendError::Malformed(e.to_string()))?;
+        let v: Value = resp
+            .into_json()
+            .map_err(|e| BackendError::Malformed(e.to_string()))?;
         let latency_ms = t0.elapsed().as_secs_f64() * 1e3;
 
         let top = v
@@ -59,12 +69,17 @@ impl Scorer for LlamaServer {
             .and_then(|c| c.get(0))
             .and_then(|c| c.get("top_logprobs"))
             .and_then(Value::as_array)
-            .ok_or_else(|| BackendError::Malformed("no completion_probabilities[0].top_logprobs".into()))?;
+            .ok_or_else(|| {
+                BackendError::Malformed("no completion_probabilities[0].top_logprobs".into())
+            })?;
 
         let mut logprobs = vec![f64::NEG_INFINITY; candidates.len()];
         for entry in top {
             let tok = entry.get("token").and_then(Value::as_str).unwrap_or("");
-            let lp = entry.get("logprob").and_then(Value::as_f64).unwrap_or(f64::NEG_INFINITY);
+            let lp = entry
+                .get("logprob")
+                .and_then(Value::as_f64)
+                .unwrap_or(f64::NEG_INFINITY);
             if let Some(i) = candidates.iter().position(|c| c == tok) {
                 if lp > logprobs[i] {
                     logprobs[i] = lp;

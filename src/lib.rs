@@ -9,6 +9,7 @@
 pub mod backend;
 pub mod eval;
 pub mod judge;
+pub mod mcp;
 pub mod prompt;
 pub mod protocol;
 pub mod score;

@@ -29,7 +29,9 @@ impl std::str::FromStr for Template {
             "gemma" => Ok(Self::Gemma),
             "llama3" | "llama" => Ok(Self::Llama3),
             "raw" | "base" | "none" => Ok(Self::Raw),
-            other => Err(format!("unknown template `{other}` (chatml|gemma|llama3|raw)")),
+            other => Err(format!(
+                "unknown template `{other}` (chatml|gemma|llama3|raw)"
+            )),
         }
     }
 }
@@ -66,9 +68,9 @@ fn letter(i: usize) -> String {
 pub fn prefix(template: Template, state_text: &str) -> String {
     let body = format!("Situation:\n{state_text}\n");
     match template {
-        Template::ChatMl => format!(
-            "<|im_start|>system\n{SYSTEM}<|im_end|>\n<|im_start|>user\n{body}"
-        ),
+        Template::ChatMl => {
+            format!("<|im_start|>system\n{SYSTEM}<|im_end|>\n<|im_start|>user\n{body}")
+        }
         Template::Gemma => format!("<start_of_turn>user\n{SYSTEM}\n\n{body}"),
         Template::Llama3 => format!(
             "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{SYSTEM}<|eot_id|>\
@@ -99,7 +101,10 @@ pub fn render(
     let mut labels = Vec::new();
     let mut keys = Vec::new();
     match q {
-        Question::Noul { instructions, criteria } => {
+        Question::Noul {
+            instructions,
+            criteria,
+        } => {
             s.push_str("\nQuestion: ");
             s.push_str(&text_of(instructions));
             s.push_str("\nOptions:\n");
@@ -112,7 +117,10 @@ pub fn render(
             labels = vec![letter(0), letter(1)];
             keys = vec!["yes".into(), "no".into()];
         }
-        Question::Choice { instructions, criteria } => {
+        Question::Choice {
+            instructions,
+            criteria,
+        } => {
             s.push_str("\nQuestion: ");
             s.push_str(&text_of(instructions));
             s.push_str("\nOptions:\n");
@@ -124,17 +132,30 @@ pub fn render(
             };
             for (pos, &i) in idx.iter().enumerate() {
                 let (k, v) = opts[i];
-                s.push_str(&format!("{}) {}{}\n", letter(pos).trim(), k, desc(&text_of(v))));
+                s.push_str(&format!(
+                    "{}) {}{}\n",
+                    letter(pos).trim(),
+                    k,
+                    desc(&text_of(v))
+                ));
                 labels.push(letter(pos));
                 keys.push(k.clone());
             }
         }
-        Question::Score { instructions, criteria } => {
+        Question::Score {
+            instructions,
+            criteria,
+        } => {
             s.push_str("\nQuestion: ");
             s.push_str(&text_of(instructions));
             s.push_str("\nRate on this ordered scale (lowest first):\n");
             for (i, level) in criteria.iter().enumerate() {
-                s.push_str(&format!("{}) level {}: {}\n", letter(i).trim(), i, text_of(level)));
+                s.push_str(&format!(
+                    "{}) level {}: {}\n",
+                    letter(i).trim(),
+                    i,
+                    text_of(level)
+                ));
                 labels.push(letter(i));
                 keys.push(i.to_string());
             }

@@ -117,8 +117,8 @@ pub fn render_state(v: &Value) -> String {
 pub fn parse_questions(raw: &Map<String, Value>) -> Result<Vec<(String, Question)>, String> {
     let mut out = Vec::with_capacity(raw.len());
     for (id, v) in raw {
-        let q: Question = serde_json::from_value(v.clone())
-            .map_err(|e| format!("question `{id}`: {e}"))?;
+        let q: Question =
+            serde_json::from_value(v.clone()).map_err(|e| format!("question `{id}`: {e}"))?;
         match &q {
             Question::Choice { criteria, .. } if criteria.is_empty() => {
                 return Err(format!("question `{id}`: choice needs at least one option"))

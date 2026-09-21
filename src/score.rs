@@ -23,7 +23,10 @@ fn one() -> f64 {
 
 impl Default for Calibration {
     fn default() -> Self {
-        Self { default: 1.0, by_bucket: HashMap::new() }
+        Self {
+            default: 1.0,
+            by_bucket: HashMap::new(),
+        }
     }
 }
 

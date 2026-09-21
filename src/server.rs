@@ -1,7 +1,6 @@
 //! A tiny synchronous HTTP server exposing `POST /v1/systemone`.
 //! Compatible with the TypeSafe SDKs via `TYPESAFE_BASE_URL`.
 
-
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -65,7 +64,10 @@ fn handle<S: Scorer>(mut req: HttpRequest, judge: &Judge<S>, keys: &[String]) {
                 }
             }
         }
-        _ => (404, json!({"message": format!("no route {} {}", method, path)})),
+        _ => (
+            404,
+            json!({"message": format!("no route {} {}", method, path)}),
+        ),
     };
     let json_hdr = Header::from_bytes("Content-Type", "application/json").unwrap();
     let resp = Response::from_string(result.1.to_string())
@@ -78,7 +80,13 @@ fn authorized(req: &HttpRequest, keys: &[String]) -> bool {
     req.headers()
         .iter()
         .find(|h| h.field.equiv("Authorization"))
-        .map(|h| h.value.as_str().trim_start_matches("Bearer ").trim().to_string())
+        .map(|h| {
+            h.value
+                .as_str()
+                .trim_start_matches("Bearer ")
+                .trim()
+                .to_string()
+        })
         .map(|k| keys.iter().any(|x| x == &k))
         .unwrap_or(false)
 }

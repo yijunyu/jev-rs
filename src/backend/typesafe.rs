@@ -21,8 +21,8 @@ pub struct TypeSafe {
 impl TypeSafe {
     pub fn from_env() -> Option<Self> {
         let api_key = std::env::var("TYPESAFE_API_KEY").ok()?;
-        let base = std::env::var("TYPESAFE_BASE_URL")
-            .unwrap_or_else(|_| "https://api.typesafe.ai".into());
+        let base =
+            std::env::var("TYPESAFE_BASE_URL").unwrap_or_else(|_| "https://api.typesafe.ai".into());
         Some(Self {
             endpoint: format!("{}/v1/systemone", base.trim_end_matches('/')),
             api_key,
@@ -42,7 +42,9 @@ impl TypeSafe {
             .send_json(body);
         let ms = t0.elapsed().as_secs_f64() * 1e3;
         let v: Value = match resp {
-            Ok(r) => r.into_json().map_err(|e| BackendError::Malformed(e.to_string()))?,
+            Ok(r) => r
+                .into_json()
+                .map_err(|e| BackendError::Malformed(e.to_string()))?,
             Err(ureq::Error::Status(code, r)) => {
                 let text = r.into_string().unwrap_or_default();
                 return Err(BackendError::Rejected(format!("{code}: {text}")));

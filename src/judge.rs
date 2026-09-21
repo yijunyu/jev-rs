@@ -7,7 +7,9 @@ use serde_json::{json, Map, Value};
 
 use crate::backend::{BackendError, Scorer};
 use crate::prompt::{self, Template, MAX_OPTIONS};
-use crate::protocol::{parse_questions, render_state, Answer, Evaluation, Question, Request, Usage};
+use crate::protocol::{
+    parse_questions, render_state, Answer, Evaluation, Question, Request, Usage,
+};
 use crate::score::{argmax, confidence, expected_level, softmax, Calibration};
 
 #[derive(Debug, Clone)]
@@ -70,7 +72,11 @@ impl<S: Scorer> Judge<S> {
                     "question `{id}`: {n} options; jev-rs currently supports at most {MAX_OPTIONS}"
                 )));
             }
-            let perms = if kind == "choice" { self.cfg.permutations.clamp(1, n) } else { 1 };
+            let perms = if kind == "choice" {
+                self.cfg.permutations.clamp(1, n)
+            } else {
+                1
+            };
             let mut mean = vec![0.0f64; n];
             let mut evaluated = 0;
             let mut cached = 0;
@@ -114,7 +120,9 @@ impl<S: Scorer> Judge<S> {
             let t = self.cfg.calibration.temperature(r.kind, r.keys.len());
             let probs = softmax(&r.logprobs, t);
             let answer = match r.kind {
-                "noul" => Answer::Noul { noul: round(probs[0]) },
+                "noul" => Answer::Noul {
+                    noul: round(probs[0]),
+                },
                 "choice" => {
                     let best = argmax(&probs);
                     Answer::Choice {
@@ -163,7 +171,11 @@ impl<S: Scorer> Judge<S> {
             model: self.scorer.model_name(),
             answers,
             usage,
-            debug: if self.cfg.debug { Some(Value::Array(debug)) } else { None },
+            debug: if self.cfg.debug {
+                Some(Value::Array(debug))
+            } else {
+                None
+            },
         })
     }
 }

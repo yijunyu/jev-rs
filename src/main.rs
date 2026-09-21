@@ -13,7 +13,11 @@ use jev_rs::score::Calibration;
 use jev_rs::server::{serve, ServerConfig};
 
 #[derive(Parser)]
-#[command(name = "jev", version, about = "System One judgments from any LLM, in one prefill")]
+#[command(
+    name = "jev",
+    version,
+    about = "System One judgments from any LLM, in one prefill"
+)]
 struct Cli {
     /// llama-server base URL (any GGUF model).
     #[arg(long, env = "JEV_BACKEND_URL", default_value = "http://127.0.0.1:8080")]
@@ -71,6 +75,8 @@ enum Cmd {
         #[arg(long)]
         rows: Option<PathBuf>,
     },
+    /// Run as an MCP server over stdio (for Claude Code, Codex, Grok Build, OpenCode).
+    Mcp,
     /// Fit per-bucket temperatures on a JSONL case file and write a calibration JSON.
     Calibrate {
         file: PathBuf,
@@ -94,15 +100,32 @@ fn run() -> Result<(), String> {
             .map_err(|e| format!("calibration: {e}"))?,
         None => Calibration::default(),
     };
-    let cfg = JudgeConfig { template, calibration, permutations: cli.permutations, debug: cli.debug };
+    let cfg = JudgeConfig {
+        template,
+        calibration,
+        permutations: cli.permutations,
+        debug: cli.debug,
+    };
     let judge = Judge::new(LlamaServer::new(cli.backend.clone()), cfg);
 
     match cli.cmd {
         Cmd::Serve { bind, api_keys } => {
-            let api_keys = api_keys.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect();
+            let api_keys = api_keys
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect();
             serve(judge, ServerConfig { bind, api_keys })
         }
-        Cmd::Ask { file, state, noul, choice, score, compare } => {
+        Cmd::Ask {
+            file,
+            state,
+            noul,
+            choice,
+            score,
+            compare,
+        } => {
             let req = build_request(file, state, noul, choice, score)?;
             let t0 = std::time::Instant::now();
             let ev = judge.evaluate(&req).map_err(|e| e.to_string())?;
@@ -123,18 +146,23 @@ fn run() -> Result<(), String> {
             let m = eval::metrics(&r, &judge.cfg.calibration);
             println!("{}", serde_json::to_string_pretty(&m).unwrap());
             if let Some(p) = rows {
-                let text: String = r.iter().map(|x| serde_json::to_string(x).unwrap() + "\n").collect();
+                let text: String = r
+                    .iter()
+                    .map(|x| serde_json::to_string(x).unwrap() + "\n")
+                    .collect();
                 std::fs::write(&p, text).map_err(|e| e.to_string())?;
             }
             Ok(())
         }
+        Cmd::Mcp => jev_rs::mcp::serve(&judge).map_err(|e| e.to_string()),
         Cmd::Calibrate { file, out } => {
             let cases = eval::load_cases(&file)?;
             let r = eval::run(&judge, &cases).map_err(|e| e.to_string())?;
             let before = eval::metrics(&r, &Calibration::default());
             let cal = eval::fit(&r);
             let after = eval::metrics(&r, &cal);
-            std::fs::write(&out, serde_json::to_string_pretty(&cal).unwrap()).map_err(|e| e.to_string())?;
+            std::fs::write(&out, serde_json::to_string_pretty(&cal).unwrap())
+                .map_err(|e| e.to_string())?;
             println!(
                 "{}",
                 json!({"calibration": cal, "before": before, "after": after, "written": out})
@@ -157,7 +185,8 @@ fn build_request(
     }
     if state.is_none() && noul.is_empty() && choice.is_empty() && score.is_empty() {
         let mut text = String::new();
-        std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map_err(|e| e.to_string())?;
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut text)
+            .map_err(|e| e.to_string())?;
         return serde_json::from_str(&text).map_err(|e| e.to_string());
     }
     let state = state.ok_or("--state is required with --noul/--choice/--score")?;
@@ -172,19 +201,38 @@ fn build_request(
         let mut criteria = Map::new();
         for o in opts.split(',') {
             let (k, d) = o.split_once(':').unwrap_or((o, ""));
-            criteria.insert(k.trim().into(), if d.trim().is_empty() { Value::Null } else { json!(d.trim()) });
+            criteria.insert(
+                k.trim().into(),
+                if d.trim().is_empty() {
+                    Value::Null
+                } else {
+                    json!(d.trim())
+                },
+            );
         }
-        questions.insert(id.into(), json!({"type": "choice", "instructions": instr, "criteria": criteria}));
+        questions.insert(
+            id.into(),
+            json!({"type": "choice", "instructions": instr, "criteria": criteria}),
+        );
     }
     for s in score {
         let (id, rest) = split_once(&s, '=')?;
         let (instr, levels) = split_once(rest, '|')?;
         let levels: Vec<&str> = levels.split(',').map(str::trim).collect();
-        questions.insert(id.into(), json!({"type": "score", "instructions": instr, "criteria": levels}));
+        questions.insert(
+            id.into(),
+            json!({"type": "score", "instructions": instr, "criteria": levels}),
+        );
     }
-    Ok(Request { model: None, state: Value::String(state), questions })
+    Ok(Request {
+        model: None,
+        state: Value::String(state),
+        questions,
+    })
 }
 
 fn split_once(s: &str, c: char) -> Result<(&str, &str), String> {
-    s.split_once(c).map(|(a, b)| (a.trim(), b.trim())).ok_or_else(|| format!("expected `{c}` in `{s}`"))
+    s.split_once(c)
+        .map(|(a, b)| (a.trim(), b.trim()))
+        .ok_or_else(|| format!("expected `{c}` in `{s}`"))
 }

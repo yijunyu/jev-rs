@@ -50,19 +50,28 @@ pub struct Row {
 pub fn run<S: Scorer>(judge: &Judge<S>, cases: &[Case]) -> Result<Vec<Row>, BackendError> {
     let mut rows = Vec::new();
     for (ci, c) in cases.iter().enumerate() {
-        let req = Request { model: c.model.clone(), state: c.state.clone(), questions: c.questions.clone() };
+        let req = Request {
+            model: c.model.clone(),
+            state: c.state.clone(),
+            questions: c.questions.clone(),
+        };
         let raws: Vec<RawQuestion> = judge.raw(&req)?;
         for r in raws {
             let Some(g) = c.gold.get(&r.id) else { continue };
             let gold = match g {
                 Value::Number(n) => n.as_u64().map(|x| x as usize),
-                Value::String(s) => r.keys.iter().position(|k| k == s).or_else(|| s.parse().ok()),
+                Value::String(s) => r
+                    .keys
+                    .iter()
+                    .position(|k| k == s)
+                    .or_else(|| s.parse().ok()),
                 Value::Bool(b) => Some(if *b { 0 } else { 1 }),
                 _ => None,
             };
             let Some(gold) = gold else {
                 return Err(BackendError::Rejected(format!(
-                    "case {ci} question `{}`: gold {g} is not an option", r.id
+                    "case {ci} question `{}`: gold {g} is not an option",
+                    r.id
                 )));
             };
             rows.push(Row {
@@ -176,7 +185,13 @@ pub fn metrics(rows: &[Row], cal: &Calibration) -> Metrics {
 pub fn fit(rows: &[Row]) -> Calibration {
     let samples: Vec<(String, Vec<f64>, usize)> = rows
         .iter()
-        .map(|r| (Calibration::bucket(&r.kind, r.n), r.raw_logprobs.clone(), r.gold))
+        .map(|r| {
+            (
+                Calibration::bucket(&r.kind, r.n),
+                r.raw_logprobs.clone(),
+                r.gold,
+            )
+        })
         .collect();
     Calibration::fit(&samples)
 }
