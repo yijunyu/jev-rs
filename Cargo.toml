@@ -9,6 +9,7 @@ repository = "https://github.com/yijunyu/jev-rs"
 readme = "README.md"
 keywords = ["llm", "classification", "calibration", "system-one", "jev"]
 categories = ["science", "web-programming::http-server"]
+exclude = [".github/", ".githooks/", "CLAUDE.md", "install.sh", "docs/"]
 
 [lib]
 name = "jev_rs"
