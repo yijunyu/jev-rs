@@ -135,25 +135,37 @@ Case-file line: `{"state": ..., "questions": {...}, "gold": {"id": "key-or-level
 
 ## Measured, not claimed
 
-Apple M1 Ultra, `llama-server` b10360, Qwen3-4B Q4_K_M, zero-shot.
-`examples/dev_tasks.jsonl`: 25 shell commands × 3 questions (command class
-8-way, safe to re-run, output volume), hand-labelled.
+Apple M1 Ultra 128 GB, `llama-server` via Homebrew, zero-shot, same
+prompts. `examples/dev_tasks.jsonl`: 25 shell commands × 3 questions
+(command class 8-way, safe to re-run, output volume 3-level), hand-labelled,
+75 decisions, 0 failed requests for either model.
 
-| metric | value |
-|---|---|
-| decisions | 75 |
-| accuracy: choice / noul / score | 0.92 / 0.64 / 0.56 |
-| ECE before → after `jev calibrate` | 0.244 → 0.164 |
-| Brier before → after | 0.512 → 0.424 |
-| latency p50 / p95 per question | 75 ms / 99 ms |
+| metric | Qwen3-4B Q4_K_M | Qwen3.8-Flash-Next Q2_K_XL (73 GB) |
+|---|---|---|
+| accuracy overall | 0.71 | **0.84** |
+| accuracy: choice / noul / score | 0.92 / 0.64 / 0.56 | 0.92 / **0.76** / **0.84** |
+| ECE raw → after `jev calibrate` | 0.244 → 0.164 | 0.108 → 0.106 |
+| Brier raw → calibrated | 0.512 → 0.424 | 0.276 → 0.252 |
+| coverage at ≤5 % error | 0.31 | **0.59** |
+| fitted temperatures | 3.4 – 6.0 | 1.1 – 2.1 |
+| latency p50 / p95 per question (warm) | **75 ms / 99 ms** | 700 ms / 1.5 s |
 
-Four questions on one state: one 167-token prefill plus three 33–62-token
-suffixes, 394 ms end to end. Hosted Jev has been independently measured at
-236–276 ms p50 per request
+What changed with the larger model: the 8-way classification was already
+saturated at 4B; the gains are on the yes/no and ordinal questions, and on
+probability quality. The big model is close to calibrated out of the box
+(temperatures near 1), so its confidence can gate twice as many decisions
+at a 5 % error budget. The 4B model is 9× faster and its fitted
+temperatures of 3–6 say its raw probabilities should not be trusted
+without `jev calibrate`.
+
+Prompt caching depends on the architecture: Qwen3-4B re-evaluates only the
+question suffix after the first question (33–62 tokens), while the hybrid
+Qwen3.8-Next re-evaluates the full prompt for every question in
+`llama-server`, so its four-question example costs 3.0 s against 0.4 s.
+
+Hosted Jev has been independently measured at 236–276 ms p50 per request
 ([jev-benchmarks](https://github.com/AbdelStark/jev-benchmarks),
 [decision-model-benchmark](https://github.com/nibzard/decision-model-benchmark)).
-A 4B instruct model is over-confident out of the box (fitted temperatures
-3–6); calibrate on your own cases before trusting the probabilities.
 
 ## Why another one
 
