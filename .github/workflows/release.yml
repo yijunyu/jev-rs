@@ -50,6 +50,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: history carries only human authors and committers
+        run: |
+          set -e
+          bad='claude|anthropic|copilot|openai|codex|gemini'
+          if git log --format='%an <%ae> %cn <%ce>' | grep -iE "$bad"; then
+            echo "::error::AI identity found as author/committer"; exit 1; fi
+          if git log --format='%B' | grep -iE "^(Co-Authored-By|Signed-off-by):.*($bad)|Generated with \[?Claude Code|🤖"; then
+            echo "::error::AI attribution trailer found in a commit message"; exit 1; fi
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt

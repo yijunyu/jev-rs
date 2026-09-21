@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Refuse to commit when the author or committer identity is an AI assistant.
+# Enable with: git config core.hooksPath .githooks
+bad='claude|anthropic|copilot|openai|codex|gemini|noreply@anthropic'
+for v in GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL; do
+  eval "val=\${$v:-}"
+  if printf '%s' "$val" | grep -iEq "$bad"; then
+    echo "pre-commit: $v='$val' looks like an AI identity; commits must carry the human author." >&2
+    exit 1
+  fi
+done
+name=$(git config user.name || true)
+email=$(git config user.email || true)
+if printf '%s %s' "$name" "$email" | grep -iEq "$bad"; then
+  echo "pre-commit: git user.name/user.email ('$name <$email>') looks like an AI identity." >&2
+  exit 1
+fi
+exit 0

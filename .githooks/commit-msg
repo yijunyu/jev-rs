@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Reject commit messages that credit an AI assistant as an author.
+# Enable with: git config core.hooksPath .githooks
+msg="$1"
+if grep -iEq '^(Co-Authored-By|Signed-off-by):.*(claude|anthropic|copilot|openai|codex|gemini)|Generated with \[?Claude Code|🤖' "$msg"; then
+  echo "commit-msg: AI attribution trailers are not allowed in this repository." >&2
+  echo "            Remove Co-Authored-By/Generated-with lines and commit again." >&2
+  exit 1
+fi
+exit 0

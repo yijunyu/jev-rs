@@ -163,7 +163,8 @@ Open Jev replacements appeared within a week of the launch
 be the judgment engine inside two Rust systems —
 [PRECC](https://github.com/peri-a-i/precc-cc), a Claude Code hook that
 saves tokens, and [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal) /
-Local Mind, an on-device DeepSeek-V4 engine — where an in-process,
+[Local Mind](https://yijunyu.github.io/local-mind/), an on-device
+DeepSeek-V4 engine — where an in-process,
 KV-forking scorer is the point.
 
 ## Limits (today)
