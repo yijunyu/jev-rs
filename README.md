@@ -19,7 +19,8 @@ curl -fsSL https://raw.githubusercontent.com/yijunyu/jev-rs/main/install.sh | sh
 ```
 
 Installs a prebuilt `jev` into `~/.local/bin` (macOS arm64/x86_64, Linux
-x86_64/arm64) or builds from source with cargo if no binary matches. Then
+x86_64/arm64) or builds from source with cargo if no binary matches.
+With a Rust toolchain, `cargo install jev-rs` works too. Then
 start any GGUF model behind `llama-server` (macOS: `brew install llama.cpp`):
 
 ```sh
