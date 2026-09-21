@@ -142,8 +142,8 @@ fn run() -> Result<(), String> {
         }
         Cmd::Eval { file, rows } => {
             let cases = eval::load_cases(&file)?;
-            let r = eval::run(&judge, &cases).map_err(|e| e.to_string())?;
-            let m = eval::metrics(&r, &judge.cfg.calibration);
+            let (r, failed) = eval::run(&judge, &cases).map_err(|e| e.to_string())?;
+            let m = eval::metrics(&r, failed, &judge.cfg.calibration);
             println!("{}", serde_json::to_string_pretty(&m).unwrap());
             if let Some(p) = rows {
                 let text: String = r
@@ -157,10 +157,10 @@ fn run() -> Result<(), String> {
         Cmd::Mcp => jev_rs::mcp::serve(&judge).map_err(|e| e.to_string()),
         Cmd::Calibrate { file, out } => {
             let cases = eval::load_cases(&file)?;
-            let r = eval::run(&judge, &cases).map_err(|e| e.to_string())?;
-            let before = eval::metrics(&r, &Calibration::default());
+            let (r, failed) = eval::run(&judge, &cases).map_err(|e| e.to_string())?;
+            let before = eval::metrics(&r, failed, &Calibration::default());
             let cal = eval::fit(&r);
-            let after = eval::metrics(&r, &cal);
+            let after = eval::metrics(&r, failed, &cal);
             std::fs::write(&out, serde_json::to_string_pretty(&cal).unwrap())
                 .map_err(|e| e.to_string())?;
             println!(

@@ -47,15 +47,27 @@ pub struct Row {
     pub prompt_cached: u64,
 }
 
-pub fn run<S: Scorer>(judge: &Judge<S>, cases: &[Case]) -> Result<Vec<Row>, BackendError> {
+/// Scored rows plus the number of cases whose backend call failed. A failed
+/// case contributes no rows; it is reported next to accuracy, as the public
+/// Jev benchmarks do. A rejected request (malformed case) still aborts.
+pub fn run<S: Scorer>(judge: &Judge<S>, cases: &[Case]) -> Result<(Vec<Row>, usize), BackendError> {
     let mut rows = Vec::new();
+    let mut failed = 0usize;
     for (ci, c) in cases.iter().enumerate() {
         let req = Request {
             model: c.model.clone(),
             state: c.state.clone(),
             questions: c.questions.clone(),
         };
-        let raws: Vec<RawQuestion> = judge.raw(&req)?;
+        let raws: Vec<RawQuestion> = match judge.raw(&req) {
+            Ok(r) => r,
+            Err(BackendError::Rejected(m)) => return Err(BackendError::Rejected(m)),
+            Err(e) => {
+                eprintln!("case {ci}: {e} (counted as failed)");
+                failed += 1;
+                continue;
+            }
+        };
         for r in raws {
             let Some(g) = c.gold.get(&r.id) else { continue };
             let gold = match g {
@@ -87,12 +99,14 @@ pub fn run<S: Scorer>(judge: &Judge<S>, cases: &[Case]) -> Result<Vec<Row>, Back
             });
         }
     }
-    Ok(rows)
+    Ok((rows, failed))
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metrics {
     pub questions: usize,
+    /// Cases whose backend call failed (no rows; not counted in accuracy).
+    pub failed_cases: usize,
     pub accuracy: f64,
     pub brier: f64,
     /// Top-label expected calibration error, 10 equal-width bins.
@@ -107,7 +121,7 @@ pub struct Metrics {
     pub by_kind: BTreeMap<String, f64>,
 }
 
-pub fn metrics(rows: &[Row], cal: &Calibration) -> Metrics {
+pub fn metrics(rows: &[Row], failed_cases: usize, cal: &Calibration) -> Metrics {
     let mut correct = 0usize;
     let mut brier = 0.0;
     let mut conf_sum = 0.0;
@@ -166,6 +180,7 @@ pub fn metrics(rows: &[Row], cal: &Calibration) -> Metrics {
     };
     Metrics {
         questions: rows.len(),
+        failed_cases,
         accuracy: correct as f64 / n,
         brier: brier / n,
         ece,
