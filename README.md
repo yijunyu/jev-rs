@@ -186,6 +186,11 @@ question suffix after the first question (33–62 tokens), while the hybrid
 Qwen3.8-Next re-evaluates the full prompt for every question in
 `llama-server`, so its four-question example costs 3.0 s against 0.4 s.
 
+Two further experiments against real Claude Code session logs, predicting
+output floods before a command runs and triaging tool output after it, are
+in [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md); one is a clear win for the
+judge, the other a clear loss to a blind rule.
+
 Hosted Jev has been independently measured at 236–276 ms p50 per request
 ([jev-benchmarks](https://github.com/AbdelStark/jev-benchmarks),
 [decision-model-benchmark](https://github.com/nibzard/decision-model-benchmark)).
