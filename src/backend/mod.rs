@@ -46,7 +46,10 @@ pub struct Scored {
     pub cost: ScoreCost,
 }
 
-pub trait Scorer: Send + Sync {
+/// No `Send + Sync` bound: an in-process engine scorer typically wraps a
+/// `&mut` session and is driven from one thread. The HTTP server adds the
+/// bounds it needs on its own generic.
+pub trait Scorer {
     /// Log-probabilities of `candidates` as the *next* token after `prompt`.
     /// Candidate strings are exact token texts (e.g. `" A"`).
     fn score(&self, prompt: &str, candidates: &[String]) -> Result<Scored, BackendError>;
