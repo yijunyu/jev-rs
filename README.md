@@ -155,23 +155,31 @@ prompts. `examples/dev_tasks.jsonl`: 25 shell commands × 3 questions
 (command class 8-way, safe to re-run, output volume 3-level), hand-labelled,
 75 decisions, 0 failed requests for either model.
 
-| metric | Qwen3-4B Q4_K_M | Qwen3.8-Flash-Next Q2_K_XL (73 GB) |
-|---|---|---|
-| accuracy overall | 0.71 | **0.84** |
-| accuracy: choice / noul / score | 0.92 / 0.64 / 0.56 | 0.92 / **0.76** / **0.84** |
-| ECE raw → after `jev calibrate` | 0.244 → 0.164 | 0.108 → 0.106 |
-| Brier raw → calibrated | 0.512 → 0.424 | 0.276 → 0.252 |
-| coverage at ≤5 % error | 0.31 | **0.59** |
-| fitted temperatures | 3.4 – 6.0 | 1.1 – 2.1 |
-| latency p50 / p95 per question (warm) | **75 ms / 99 ms** | 700 ms / 1.5 s |
+| metric | Qwen3-4B Q4_K_M | Qwen3.8-Flash-Next Q2_K_XL (73 GB) | DeepSeek-V4-Flash MXFP4 (156 GB, SSD-streamed) |
+|---|---|---|---|
+| backend | llama-server, raw logprobs | llama-server, raw logprobs | ds4-rs-metal, chat logprobs, thinking off |
+| accuracy overall | 0.71 | **0.84** | 0.76 |
+| accuracy: choice / noul / score | 0.92 / 0.64 / 0.56 | 0.92 / 0.76 / **0.84** | 0.88 / **0.92** / 0.48 |
+| ECE raw | 0.244 | 0.108 | 0.112 |
+| Brier raw | 0.512 | 0.276 | 0.371 |
+| coverage at ≤5 % error | 0.31 | **0.59** | 0.56 |
+| latency p50 per question (warm) | **75 ms** | 700 ms | 41 s |
 
-What changed with the larger model: the 8-way classification was already
-saturated at 4B; the gains are on the yes/no and ordinal questions, and on
-probability quality. The big model is close to calibrated out of the box
-(temperatures near 1), so its confidence can gate twice as many decisions
-at a 5 % error budget. The 4B model is 9× faster and its fitted
-temperatures of 3–6 say its raw probabilities should not be trusted
-without `jev calibrate`.
+What changed with the larger models: the 8-way classification was already
+saturated at 4B; the gains are on the yes/no and ordinal questions and on
+probability quality. Both large models are close to calibrated out of the
+box (fitted temperatures near 1), so their confidence can gate about twice
+as many decisions at a 5 % error budget. The 4B model is far faster and
+its fitted temperatures of 3–6 say its raw probabilities should not be
+trusted without `jev calibrate`.
+
+DeepSeek V4 Flash gives the best yes/no judgment of the three (0.92 on
+"safe to re-run") and the worst ordinal one: of its 13 wrong `score`
+answers, 12 guessed low and 11 of those by exactly one level, a systematic
+bias a per-model calibration or a coarser scale would absorb. Its latency is an artefact of the run,
+not the model: 156 GB of tensors on a 128 GB machine means experts stream
+from SSD on every request. With the model resident (a 192 GB or 256 GB
+Mac) the same engine prefills at hundreds of tokens per second.
 
 Prompt caching depends on the architecture: Qwen3-4B re-evaluates only the
 question suffix after the first question (33–62 tokens), while the hybrid
