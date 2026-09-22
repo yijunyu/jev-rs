@@ -208,6 +208,14 @@ saves tokens, and [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal) /
 DeepSeek-V4 engine — where an in-process,
 KV-forking scorer is the point.
 
+**Other servers that speak the form.** The same `POST /v1/systemone` is also
+served locally by [System One Lite](https://github.com/snellingio/system-one)
+(MLX, Apple silicon) and by
+[coreai-kit](https://github.com/john-rocky/coreai-kit/blob/main/docs/SYSTEM_ONE.md)
+(`decide-cli serve`, Apple Core AI on macOS); the vendor-neutral
+[system-one](https://github.com/asynq-io/system-one) SDK reaches any of them
+through `HTTPConfig(base_url=…)`.
+
 ## Limits (today)
 
 - At most 26 options per question (single-letter labels); Jev accepts 255.
