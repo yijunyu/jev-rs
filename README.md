@@ -48,6 +48,21 @@ jev --backend http://127.0.0.1:8089 ask \
 Set `JEV_BACKEND_URL` once to drop the `--backend` flag. Use
 `--template gemma|llama3|raw` for non-ChatML models.
 
+**Hosted or OpenAI-compatible backends.** `--backend-kind openai` scores
+through `chat/completions` with `logprobs` (`max_tokens: 1`,
+`top_logprobs: 20`), so the DeepSeek API, vLLM, SGLang or llama-server's
+own `/v1` endpoint work without raw prompt access:
+
+```sh
+export JEV_API_KEY=$DEEPSEEK_API_KEY
+jev --backend https://api.deepseek.com/v1 --backend-kind openai --model deepseek-flash \
+    eval examples/dev_tasks.jsonl
+```
+
+The server applies its own chat template, so answers depend on the model
+emitting the option letter as its first token; the raw `llamacpp` path is
+exact and preferred when you control the server.
+
 ## Use with coding agents
 
 `jev mcp` is an MCP server over stdio with one tool, `judge`. The agent
