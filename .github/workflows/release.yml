@@ -73,3 +73,6 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - run: cargo build --lib --no-default-features
+      - name: in-process llama.cpp backend (CPU) compiles
+        run: cargo build --features llamacpp

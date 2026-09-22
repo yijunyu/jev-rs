@@ -63,6 +63,21 @@ The server applies its own chat template, so answers depend on the model
 emitting the option letter as its first token; the raw `llamacpp` path is
 exact and preferred when you control the server.
 
+**No server at all.** Built with `--features llamacpp-metal` (Apple GPU) or
+`--features llamacpp` (CPU), `jev` loads the GGUF itself and reads the
+logits in-process; the state prefix stays in the KV cache between
+questions:
+
+```sh
+cargo build --release --features llamacpp-metal      # compiles llama.cpp, needs cmake
+jev --backend-kind inproc --model-path Qwen3-4B-Q4_K_M.gguf ask --file examples/support_ticket.json
+```
+
+On the pilot set this path gives the same logprobs as `llama-server` to the
+last decimal (accuracy 0.707, p50 77 ms per question) and the four-question
+example costs 299 evaluated tokens: one 167-token prefill plus three
+question suffixes, the rest served from cache.
+
 ## Use with coding agents
 
 `jev mcp` is an MCP server over stdio with one tool, `judge`. The agent

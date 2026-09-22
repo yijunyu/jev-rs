@@ -68,7 +68,10 @@ impl<'de> Deserialize<'de> for OrderedCriteria {
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("a map of option key -> description")
             }
-            fn visit_map<A: serde::de::MapAccess<'de>>(self, mut m: A) -> Result<Self::Value, A::Error> {
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut m: A,
+            ) -> Result<Self::Value, A::Error> {
                 let mut out = Vec::with_capacity(m.size_hint().unwrap_or(0));
                 while let Some((k, v)) = m.next_entry::<String, Value>()? {
                     out.push((k, v));

@@ -9,6 +9,9 @@
 // The backends that reach a model over HTTP. Optional, because an embedder
 // running in the same process as the model implements [`Scorer`] directly
 // and has no use for an HTTP client.
+/// In-process llama.cpp (feature `llamacpp`): any GGUF, no server.
+#[cfg(feature = "llamacpp")]
+pub mod llama_inproc;
 #[cfg(feature = "http-backends")]
 pub mod llamacpp;
 #[cfg(feature = "http-backends")]

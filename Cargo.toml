@@ -35,6 +35,10 @@ http-backends = ["dep:ureq"]
 # Keep JSON object key order in requests and answers (pulls `indexmap`).
 # Choice-option order never depends on it: see `protocol::OrderedCriteria`.
 preserve-order = ["serde_json/preserve_order"]
+# In-process llama.cpp: load a GGUF into this process, no server. Builds
+# llama.cpp from source (cmake). `llamacpp-metal` adds the Apple GPU backend.
+llamacpp = ["dep:llama-cpp-2"]
+llamacpp-metal = ["llamacpp", "llama-cpp-2/metal"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -43,6 +47,7 @@ thiserror = "1"
 ureq = { version = "2", features = ["json"], optional = true }
 clap = { version = "4", features = ["derive", "env"], optional = true }
 tiny_http = { version = "0.12", optional = true }
+llama-cpp-2 = { version = "0.1.156", optional = true }
 
 [profile.release]
 opt-level = 3

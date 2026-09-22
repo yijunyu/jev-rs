@@ -38,6 +38,15 @@ struct Cli {
     /// Extra JSON merged into openai requests, e.g. '{"thinking":{"type":"disabled"}}'.
     #[arg(long, env = "JEV_EXTRA")]
     extra: Option<String>,
+    /// GGUF file for --backend-kind inproc (built with --features llamacpp).
+    #[arg(long, env = "JEV_MODEL_PATH")]
+    model_path: Option<PathBuf>,
+    /// Context size for --backend-kind inproc.
+    #[arg(long, default_value_t = 8192)]
+    n_ctx: u32,
+    /// Layers offloaded to the GPU for --backend-kind inproc (0 = CPU only).
+    #[arg(long, default_value_t = 1000)]
+    n_gpu_layers: u32,
     /// Chat template of the backend model: chatml | gemma | llama3 | raw
     #[arg(long, env = "JEV_TEMPLATE", default_value = "chatml")]
     template: String,
@@ -134,9 +143,23 @@ fn run() -> Result<(), String> {
             // The chat server applies its own template; render plain text.
             (Box::new(s), Template::Raw)
         }
+        #[cfg(feature = "llamacpp")]
+        "inproc" | "gguf" => {
+            let path = cli
+                .model_path
+                .clone()
+                .ok_or("--model-path is required with --backend-kind inproc")?;
+            let s = jev_rs::backend::llama_inproc::LlamaInProcess::load(&path, cli.n_ctx, cli.n_gpu_layers)
+                .map_err(|e| e.to_string())?;
+            (Box::new(s), template)
+        }
+        #[cfg(not(feature = "llamacpp"))]
+        "inproc" | "gguf" => {
+            return Err("this build has no in-process llama.cpp; rebuild with --features llamacpp-metal (or llamacpp)".into())
+        }
         other => {
             return Err(format!(
-                "unknown --backend-kind `{other}` (llamacpp|openai)"
+                "unknown --backend-kind `{other}` (llamacpp|openai|inproc)"
             ))
         }
     };

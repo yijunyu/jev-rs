@@ -16,7 +16,10 @@ pub struct ServerConfig {
     pub api_keys: Vec<String>,
 }
 
-pub fn serve<S: Scorer + Send + Sync + 'static>(judge: Judge<S>, cfg: ServerConfig) -> Result<(), String> {
+pub fn serve<S: Scorer + Send + Sync + 'static>(
+    judge: Judge<S>,
+    cfg: ServerConfig,
+) -> Result<(), String> {
     let server = Server::http(&cfg.bind).map_err(|e| format!("bind {}: {e}", cfg.bind))?;
     let judge = Arc::new(judge);
     let keys = Arc::new(cfg.api_keys);
