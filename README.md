@@ -211,7 +211,13 @@ KV-forking scorer is the point.
 ## Limits (today)
 
 - At most 26 options per question (single-letter labels); Jev accepts 255.
-- One backend, `llama-server`. In-process llama.cpp and ds4-rs backends are next.
+- Backends: `llama-server` (raw logprobs), any OpenAI-compatible
+  `chat/completions` with logprobs, and, as a library embedded in
+  [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal)'s server, an
+  in-process scorer that reads the post-prefill logits directly
+  (`POST /v1/systemone` on the engine itself; 30 decisions on DeepSeek V4
+  Flash: accuracy 0.87, ECE 0.09, no HTTP hop). Build the library with
+  `--no-default-features` to embed it; the `Scorer` trait is one method.
 - Zero-shot only; no RLCD-style training.
 
 ## License
