@@ -59,6 +59,22 @@ pub trait Scorer {
 
     /// Human-readable identity for the `model` field.
     fn model_name(&self) -> String;
+
+    /// Score several prompts that share a prefix (the questions of one
+    /// request). The default scores them one by one; an in-process backend
+    /// overrides it to prefill the shared prefix once and decode every
+    /// question tail in a single batched step.
+    fn score_many(
+        &self,
+        prompts: &[String],
+        candidates: &[Vec<String>],
+    ) -> Result<Vec<Scored>, BackendError> {
+        prompts
+            .iter()
+            .zip(candidates)
+            .map(|(p, c)| self.score(p, c))
+            .collect()
+    }
 }
 
 impl<T: Scorer + ?Sized> Scorer for Box<T> {
@@ -67,5 +83,12 @@ impl<T: Scorer + ?Sized> Scorer for Box<T> {
     }
     fn model_name(&self) -> String {
         (**self).model_name()
+    }
+    fn score_many(
+        &self,
+        prompts: &[String],
+        candidates: &[Vec<String>],
+    ) -> Result<Vec<Scored>, BackendError> {
+        (**self).score_many(prompts, candidates)
     }
 }

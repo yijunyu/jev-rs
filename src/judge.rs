@@ -57,11 +57,22 @@ impl<S: Scorer> Judge<S> {
     }
 
     /// Score every question and return uncalibrated per-option logprobs.
+    /// All prompts of the request (every question, every rotation) go to the
+    /// backend in one `score_many` call so it can share the state prefix.
     pub fn raw(&self, req: &Request) -> Result<Vec<RawQuestion>, BackendError> {
         let questions = parse_questions(&req.questions).map_err(BackendError::Rejected)?;
         let prefix = prompt::prefix(self.cfg.template, &render_state(&req.state));
-        let mut out = Vec::with_capacity(questions.len());
-        for (id, q) in &questions {
+
+        // Plan: one (question index, rotation order) per prompt.
+        struct Plan {
+            q: usize,
+            order: Vec<usize>,
+        }
+        let mut plans = Vec::new();
+        let mut prompts = Vec::new();
+        let mut cands = Vec::new();
+        let mut meta = Vec::with_capacity(questions.len()); // (kind, n, keys)
+        for (qi, (id, q)) in questions.iter().enumerate() {
             let (kind, n) = match q {
                 Question::Noul { .. } => ("noul", 2),
                 Question::Choice { criteria, .. } => ("choice", criteria.len()),
@@ -77,10 +88,6 @@ impl<S: Scorer> Judge<S> {
             } else {
                 1
             };
-            let mut mean = vec![0.0f64; n];
-            let mut evaluated = 0;
-            let mut cached = 0;
-            let t0 = Instant::now();
             let mut keys = Vec::new();
             for r in 0..perms {
                 let order: Vec<usize> = (0..n).map(|i| (i + r) % n).collect();
@@ -89,24 +96,60 @@ impl<S: Scorer> Judge<S> {
                     // rotation 0 is the identity: keys are in request order.
                     keys = rendered.keys.clone();
                 }
-                let scored = self.scorer.score(&rendered.prompt(), &rendered.labels)?;
-                let p = softmax(&scored.logprobs, 1.0);
-                // rendered position `pos` holds original option `order[pos]`.
-                for (pos, &orig) in order.iter().enumerate() {
-                    mean[orig] += p[pos] / perms as f64;
-                }
-                evaluated += scored.cost.prompt_evaluated;
-                cached += scored.cost.prompt_cached;
+                prompts.push(rendered.prompt());
+                cands.push(rendered.labels.clone());
+                plans.push(Plan { q: qi, order });
             }
-            out.push(RawQuestion {
+            meta.push((kind, n, keys, perms));
+        }
+
+        let t0 = Instant::now();
+        let scored = self.scorer.score_many(&prompts, &cands)?;
+        let total_ms = t0.elapsed().as_secs_f64() * 1e3;
+        if scored.len() != prompts.len() {
+            return Err(BackendError::Malformed(format!(
+                "backend returned {} results for {} prompts",
+                scored.len(),
+                prompts.len()
+            )));
+        }
+
+        let mut out: Vec<RawQuestion> = questions
+            .iter()
+            .zip(&meta)
+            .map(|((id, _), (kind, n, keys, _))| RawQuestion {
                 id: id.clone(),
                 kind,
-                keys,
-                logprobs: mean.iter().map(|p| p.max(1e-300).ln()).collect(),
-                prompt_evaluated: evaluated,
-                prompt_cached: cached,
-                latency_ms: t0.elapsed().as_secs_f64() * 1e3,
-            });
+                keys: keys.clone(),
+                logprobs: vec![0.0; *n], // holds mean probability until the end
+                prompt_evaluated: 0,
+                prompt_cached: 0,
+                latency_ms: 0.0,
+            })
+            .collect();
+        for (plan, s) in plans.iter().zip(&scored) {
+            let r = &mut out[plan.q];
+            let perms = meta[plan.q].3 as f64;
+            let p = softmax(&s.logprobs, 1.0);
+            // rendered position `pos` holds original option `order[pos]`.
+            for (pos, &orig) in plan.order.iter().enumerate() {
+                r.logprobs[orig] += p[pos] / perms;
+            }
+            r.prompt_evaluated += s.cost.prompt_evaluated;
+            r.prompt_cached += s.cost.prompt_cached;
+            r.latency_ms += s.cost.latency_ms;
+        }
+        // A batched backend reports one latency for the whole group (the
+        // rest are 0); spread the wall time evenly so per-question numbers
+        // stay meaningful.
+        if scored.iter().any(|s| s.cost.latency_ms == 0.0) {
+            let each = total_ms / out.len().max(1) as f64;
+            for r in &mut out {
+                r.latency_ms = each;
+            }
+        }
+        for r in &mut out {
+            r.logprobs = r.logprobs.iter().map(|p| p.max(1e-300).ln()).collect();
         }
         Ok(out)
     }

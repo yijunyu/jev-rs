@@ -73,10 +73,14 @@ cargo build --release --features llamacpp-metal      # compiles llama.cpp, needs
 jev --backend-kind inproc --model-path Qwen3-4B-Q4_K_M.gguf ask --file examples/support_ticket.json
 ```
 
-On the pilot set this path gives the same logprobs as `llama-server` to the
-last decimal (accuracy 0.707, p50 77 ms per question) and the four-question
-example costs 299 evaluated tokens: one 167-token prefill plus three
-question suffixes, the rest served from cache.
+All questions of a request are scored in one batched step: the shared
+state prefix is decoded once, forked into one KV sequence per question
+(`kv_cache_seq_cp`, a bookkeeping copy in the unified cache), and every
+question tail is decoded in a single `llama_decode`. On the pilot set this
+path gives the same answers as `llama-server` (accuracy 0.707, p50 70 ms
+per question) and the four-question example is one 167-token prefill plus
+one decode of 62 + 37 + 36 tail tokens, 326 ms end to end including model
+warm-up.
 
 ## Use with coding agents
 
