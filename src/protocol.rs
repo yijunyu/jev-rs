@@ -29,16 +29,66 @@ pub enum Question {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         criteria: Option<NoulCriteria>,
     },
-    /// One of N named options. Values are optional descriptions.
+    /// One of N named options, in request order. Values are optional descriptions.
     Choice {
         instructions: Value,
-        criteria: Map<String, Value>,
+        criteria: OrderedCriteria,
     },
     /// An ordered scale; `criteria[i]` describes level `i`.
     Score {
         instructions: Value,
         criteria: Vec<Value>,
     },
+}
+
+/// Choice options as `(key, description)` pairs in the order the request
+/// listed them. Order matters: it fixes which option is `A`, `B`, `C`… and
+/// therefore the position-bias profile, so it must not depend on whether
+/// `serde_json` was built with `preserve_order`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct OrderedCriteria(pub Vec<(String, Value)>);
+
+impl OrderedCriteria {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.0.iter().map(|(k, v)| (k, v))
+    }
+}
+
+impl<'de> Deserialize<'de> for OrderedCriteria {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = OrderedCriteria;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a map of option key -> description")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, mut m: A) -> Result<Self::Value, A::Error> {
+                let mut out = Vec::with_capacity(m.size_hint().unwrap_or(0));
+                while let Some((k, v)) = m.next_entry::<String, Value>()? {
+                    out.push((k, v));
+                }
+                Ok(OrderedCriteria(out))
+            }
+        }
+        d.deserialize_map(V)
+    }
+}
+
+impl Serialize for OrderedCriteria {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut m = s.serialize_map(Some(self.0.len()))?;
+        for (k, v) in &self.0 {
+            m.serialize_entry(k, v)?;
+        }
+        m.end()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

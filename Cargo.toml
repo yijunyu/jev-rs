@@ -24,7 +24,7 @@ required-features = ["cli", "serve", "http-backends"]
 
 [features]
 # Everything, so `cargo build` and `cargo install` are unchanged.
-default = ["cli", "serve", "http-backends"]
+default = ["cli", "serve", "http-backends", "preserve-order"]
 # The `jev` command line.
 cli = ["dep:clap"]
 # `jev serve`, the Jev-compatible HTTP server.
@@ -32,10 +32,13 @@ serve = ["dep:tiny_http"]
 # The backends that reach a model over HTTP: llama-server, an
 # OpenAI-compatible server, and hosted Jev.
 http-backends = ["dep:ureq"]
+# Keep JSON object key order in requests and answers (pulls `indexmap`).
+# Choice-option order never depends on it: see `protocol::OrderedCriteria`.
+preserve-order = ["serde_json/preserve_order"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_json = "1"
 thiserror = "1"
 ureq = { version = "2", features = ["json"], optional = true }
 clap = { version = "4", features = ["derive", "env"], optional = true }
