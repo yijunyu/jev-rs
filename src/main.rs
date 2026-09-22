@@ -4,7 +4,9 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Map, Value};
 
 use jev_rs::backend::llamacpp::LlamaServer;
+use jev_rs::backend::openai::OpenAiChat;
 use jev_rs::backend::typesafe::TypeSafe;
+use jev_rs::backend::Scorer;
 use jev_rs::eval;
 use jev_rs::judge::{Judge, JudgeConfig};
 use jev_rs::prompt::Template;
@@ -19,9 +21,23 @@ use jev_rs::server::{serve, ServerConfig};
     about = "System One judgments from any LLM, in one prefill"
 )]
 struct Cli {
-    /// llama-server base URL (any GGUF model).
+    /// Backend base URL: a llama-server root, or an OpenAI-compatible `/v1`
+    /// root (DeepSeek API, vLLM, SGLang) with --backend-kind openai.
     #[arg(long, env = "JEV_BACKEND_URL", default_value = "http://127.0.0.1:8080")]
     backend: String,
+    /// llamacpp (raw next-token logprobs via /completion) | openai
+    /// (chat/completions with logprobs; the server applies its own template)
+    #[arg(long, env = "JEV_BACKEND_KIND", default_value = "llamacpp")]
+    backend_kind: String,
+    /// Model id for --backend-kind openai (e.g. deepseek-chat).
+    #[arg(long, env = "JEV_MODEL")]
+    model: Option<String>,
+    /// Environment variable holding the API key for --backend-kind openai.
+    #[arg(long, default_value = "JEV_API_KEY")]
+    api_key_env: String,
+    /// Extra JSON merged into openai requests, e.g. '{"thinking":{"type":"disabled"}}'.
+    #[arg(long, env = "JEV_EXTRA")]
+    extra: Option<String>,
     /// Chat template of the backend model: chatml | gemma | llama3 | raw
     #[arg(long, env = "JEV_TEMPLATE", default_value = "chatml")]
     template: String,
@@ -100,13 +116,37 @@ fn run() -> Result<(), String> {
             .map_err(|e| format!("calibration: {e}"))?,
         None => Calibration::default(),
     };
+    let (scorer, template): (Box<dyn Scorer>, Template) = match cli.backend_kind.as_str() {
+        "llamacpp" | "llama" => (Box::new(LlamaServer::new(cli.backend.clone())), template),
+        "openai" | "chat" => {
+            let model = cli
+                .model
+                .clone()
+                .ok_or("--model is required with --backend-kind openai")?;
+            let mut s = OpenAiChat::new(
+                cli.backend.clone(),
+                model,
+                std::env::var(&cli.api_key_env).ok(),
+            );
+            if let Some(x) = &cli.extra {
+                s.extra = serde_json::from_str(x).map_err(|e| format!("--extra: {e}"))?;
+            }
+            // The chat server applies its own template; render plain text.
+            (Box::new(s), Template::Raw)
+        }
+        other => {
+            return Err(format!(
+                "unknown --backend-kind `{other}` (llamacpp|openai)"
+            ))
+        }
+    };
     let cfg = JudgeConfig {
         template,
         calibration,
         permutations: cli.permutations,
         debug: cli.debug,
     };
-    let judge = Judge::new(LlamaServer::new(cli.backend.clone()), cfg);
+    let judge = Judge::new(scorer, cfg);
 
     match cli.cmd {
         Cmd::Serve { bind, api_keys } => {

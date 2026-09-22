@@ -7,6 +7,7 @@
 //! question), an in-process llama.cpp context (`llama_kv_self_seq_cp`).
 
 pub mod llamacpp;
+pub mod openai;
 pub mod typesafe;
 
 use thiserror::Error;
@@ -46,4 +47,13 @@ pub trait Scorer: Send + Sync {
 
     /// Human-readable identity for the `model` field.
     fn model_name(&self) -> String;
+}
+
+impl Scorer for Box<dyn Scorer> {
+    fn score(&self, prompt: &str, candidates: &[String]) -> Result<Scored, BackendError> {
+        (**self).score(prompt, candidates)
+    }
+    fn model_name(&self) -> String {
+        (**self).model_name()
+    }
 }
