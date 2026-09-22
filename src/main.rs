@@ -116,7 +116,7 @@ fn run() -> Result<(), String> {
             .map_err(|e| format!("calibration: {e}"))?,
         None => Calibration::default(),
     };
-    let (scorer, template): (Box<dyn Scorer>, Template) = match cli.backend_kind.as_str() {
+    let (scorer, template): (Box<dyn Scorer + Send + Sync>, Template) = match cli.backend_kind.as_str() {
         "llamacpp" | "llama" => (Box::new(LlamaServer::new(cli.backend.clone())), template),
         "openai" | "chat" => {
             let model = cli

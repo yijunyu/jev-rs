@@ -58,7 +58,7 @@ pub trait Scorer {
     fn model_name(&self) -> String;
 }
 
-impl Scorer for Box<dyn Scorer> {
+impl<T: Scorer + ?Sized> Scorer for Box<T> {
     fn score(&self, prompt: &str, candidates: &[String]) -> Result<Scored, BackendError> {
         (**self).score(prompt, candidates)
     }
