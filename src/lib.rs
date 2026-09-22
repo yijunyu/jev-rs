@@ -13,4 +13,7 @@ pub mod mcp;
 pub mod prompt;
 pub mod protocol;
 pub mod score;
+/// The Jev-compatible HTTP server. Optional: an embedder that already has a
+/// server of its own wants the pipeline, not a second listener.
+#[cfg(feature = "serve")]
 pub mod server;

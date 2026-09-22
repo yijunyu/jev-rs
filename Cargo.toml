@@ -18,14 +18,28 @@ path = "src/lib.rs"
 [[bin]]
 name = "jev"
 path = "src/main.rs"
+# The command line drives every backend and the server, so it needs them all.
+# An embedder takes the library with --no-default-features instead.
+required-features = ["cli", "serve", "http-backends"]
+
+[features]
+# Everything, so `cargo build` and `cargo install` are unchanged.
+default = ["cli", "serve", "http-backends"]
+# The `jev` command line.
+cli = ["dep:clap"]
+# `jev serve`, the Jev-compatible HTTP server.
+serve = ["dep:tiny_http"]
+# The backends that reach a model over HTTP: llama-server, an
+# OpenAI-compatible server, and hosted Jev.
+http-backends = ["dep:ureq"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-ureq = { version = "2", features = ["json"] }
-clap = { version = "4", features = ["derive", "env"] }
-tiny_http = "0.12"
 thiserror = "1"
+ureq = { version = "2", features = ["json"], optional = true }
+clap = { version = "4", features = ["derive", "env"], optional = true }
+tiny_http = { version = "0.12", optional = true }
 
 [profile.release]
 opt-level = 3

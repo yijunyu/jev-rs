@@ -6,8 +6,14 @@
 //! Planned: an in-process ds4-rs-metal session (`AttnStepState` fork per
 //! question), an in-process llama.cpp context (`llama_kv_self_seq_cp`).
 
+// The backends that reach a model over HTTP. Optional, because an embedder
+// running in the same process as the model implements [`Scorer`] directly
+// and has no use for an HTTP client.
+#[cfg(feature = "http-backends")]
 pub mod llamacpp;
+#[cfg(feature = "http-backends")]
 pub mod openai;
+#[cfg(feature = "http-backends")]
 pub mod typesafe;
 
 use thiserror::Error;
