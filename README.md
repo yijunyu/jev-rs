@@ -7,6 +7,12 @@ text. Wire-compatible with TypeSafe's Jev
 [`POST /v1/systemone`](https://docs.typesafe.ai/api), and exposed to coding
 agents as an MCP tool.
 
+Among the open Jev reimplementations, jev-rs is the only one that is not
+itself a model or a single technique: it is the harness around the whole
+ecosystem — a logprob scorer that reads *any* decoder, adapters for the
+trained specialists, the TypeSafe wire server, and one `eval`/`calibrate`
+metric stack that scores all of them side by side (tables below).
+
 ```
 Claude Code / Codex / Grok Build / OpenCode ──MCP stdio──▶ jev ──▶ llama-server (any GGUF)
 TypeSafe SDKs (TYPESAFE_BASE_URL) ──────────POST /v1/systemone──▶ jev serve ──▶ llama-server
@@ -265,28 +271,70 @@ to win. Pick by traffic:
 - open-ended or changing questions → the default `llamacpp` / `openai`
   logprob path
 
-## Why another one
+## The ecosystem, and where jev-rs sits
 
-Open Jev replacements appeared within a week of the launch
-([Laya](https://huggingface.co/convaiinnovations/laya),
-[AgentJev](https://github.com/malevrigns/agent-jev),
-[jeff](https://github.com/lodos3/jeff),
-[jev-bridge](https://github.com/TOSUKUi/jev-bridge)).
-jev-rs is built to
-be the judgment engine inside two Rust systems —
+Open Jev solutions cluster into three groups. Wire compatibility matters
+here: everything that speaks `POST /v1/systemone` (or a thin variant) can be
+swapped in and out, so the groups are not walled gardens.
+
+**1. Servers that speak the wire format.** Hosted Jev is the reference;
+[jeff](https://github.com/lodos3/jeff) (GLiFormer 400M),
+[SemIf](https://github.com/TheoLeeCJ/SemIf) (formerly OpenJev; frozen
+Qwen3.5-4B option-logit readout, MIT),
+[jev-bridge](https://github.com/TOSUKUi/jev-bridge) (Rust, OpenAI-API →
+letter-slot logprob readout),
+[djev-spark](https://djev.dev/) (DiffusionGemma, multimodal), and jev-rs
+itself all serve the same request shape. So do
+[System One Lite](https://github.com/snellingio/system-one) (MLX, Apple
+silicon) and [coreai-kit](https://github.com/john-rocky/coreai-kit/blob/main/docs/SYSTEM_ONE.md)
+(`decide-cli serve`, Apple Core AI); the vendor-neutral
+[system-one](https://github.com/asynq-io/system-one) SDK reaches any of them
+through `HTTPConfig(base_url=…)`. SemIf is the strongest open row on
+the published JevBench composite (#2, 0.7 behind Jev); jeff and jeff-class
+rebuilds trail further.
+
+**2. Trained specialist models.** [Laya](https://huggingface.co/convaiinnovations/laya)
+(ModernBERT, Apache-2.0),
+[AgentJev](https://github.com/malevrigns/agent-jev) (0.6B) and
+[NanoJev](https://huggingface.co/C-Tianyu/NanoJev) (Qwen3-0.6B + decision
+heads, 2–255 candidates) return full distributions over their trained
+schemas. jev-rs wires the first two as first-class backends
+(`--backend-kind laya`, `--backend-kind agentjev`); NanoJev is not wired yet.
+
+**3. Client-side adapters and alternate techniques.**
+`system-one-adapter` (TypeSafe's own LLM-backed adapter),
+[poorjev](https://pypi.org/project/poorjev/) (local NLI + temperature
+scaling), AnyJev (Nokia), Jevlike, LocalJev, Nimble — these reach the same
+interface from a different mechanism or sit in front of it rather than
+behind it.
+
+**What is unique about jev-rs.** Every other open project is one model
+(Laya, AgentJev, NanoJev, jeff), one readout technique (SemIf, jev-bridge,
+poorjev), or hosted (Jev, djev). jev-rs is the only project that is all of:
+
+- **a generalizing scorer** — the same prefill + label-logprob readout works
+  against *any* GGUF through llama-server or any OpenAI-compatible `/v1`
+  host, zero-shot on schemas it was never trained on;
+- **a hub for the specialists** — the full-request backends (Laya,
+  System One, AgentJev) plug into the same `FullBackend` trait, so their
+  probabilities are scored by the identical harness;
+- **the wire server** — `jev serve` is a drop-in for `api.typesafe.ai`, so
+  the official SDKs and every `/v1/systemone` integration run against any of
+  the above;
+- **one measurement stack** — `jev eval` / `jev calibrate` report accuracy,
+  Brier, top-label ECE, coverage and latency for *every* backend, which is
+  how the two comparison tables above were produced, and an MCP server so
+  coding agents get the same judgments in-session.
+
+In short: the ecosystem offers interchangeable parts; jev-rs is the
+chassis that mounts them and the dyno that measures them.
+
+It is also built to be the judgment engine inside two Rust systems —
 [PRECC](https://github.com/peri-a-i/precc-cc), a Claude Code hook that
 saves tokens, and [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal) /
 [Local Mind](https://yijunyu.github.io/local-mind/), an on-device
 DeepSeek-V4 engine — where an in-process,
 KV-forking scorer is the point.
-
-**Other servers that speak the form.** The same `POST /v1/systemone` is also
-served locally by [System One Lite](https://github.com/snellingio/system-one)
-(MLX, Apple silicon) and by
-[coreai-kit](https://github.com/john-rocky/coreai-kit/blob/main/docs/SYSTEM_ONE.md)
-(`decide-cli serve`, Apple Core AI on macOS); the vendor-neutral
-[system-one](https://github.com/asynq-io/system-one) SDK reaches any of them
-through `HTTPConfig(base_url=…)`.
 
 ## Limits (today)
 
