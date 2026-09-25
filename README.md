@@ -291,7 +291,9 @@ through `HTTPConfig(base_url=…)`.
 ## Limits (today)
 
 - At most 26 options per question (single-letter labels); Jev accepts 255.
-- One backend, `llama-server`. In-process llama.cpp and ds4-rs backends are next.
+- Scorer backends: `llama-server` (raw logprobs) and any OpenAI-compatible
+  `/v1` host. Full-request backends: Laya/`systemone`, AgentJev.
+  In-process llama.cpp and ds4-rs scorers are next.
 - Zero-shot only; no RLCD-style training.
 
 ## License
