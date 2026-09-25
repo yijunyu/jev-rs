@@ -34,7 +34,7 @@ pub fn load_cases(path: &Path) -> Result<Vec<Case>, String> {
 }
 
 /// One scored question with its gold index, kept for fitting/reporting.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Row {
     pub case_index: usize,
     pub id: String,

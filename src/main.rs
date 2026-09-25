@@ -110,6 +110,28 @@ enum Cmd {
         #[arg(long, default_value = "calibration.json")]
         out: PathBuf,
     },
+    /// Stack several backends' `eval --rows` files: fit a meta-calibrator on
+    /// a case-level train split and report it against each member on test.
+    Ensemble {
+        /// Row files from `jev eval --rows`, one per member backend.
+        #[arg(long = "rows", required = true)]
+        rows: Vec<PathBuf>,
+        /// Write the fitted stacker here (JSON).
+        #[arg(long, default_value = "ensemble.json")]
+        out: PathBuf,
+        /// Apply this saved stacker instead of fitting.
+        #[arg(long)]
+        model: Option<PathBuf>,
+        /// Fraction of cases held out for testing (case-level split).
+        #[arg(long, default_value_t = 0.3)]
+        test: f64,
+        /// Gradient-descent iterations for the meta-model.
+        #[arg(long, default_value_t = 600)]
+        iterations: usize,
+        /// L2 regularization on the meta-model weights.
+        #[arg(long, default_value_t = 1e-3)]
+        lambda: f64,
+    },
 }
 
 fn main() {
@@ -293,6 +315,37 @@ fn run() -> Result<(), String> {
                 "{}",
                 json!({"calibration": cal, "before": before, "after": after, "written": out})
             );
+            Ok(())
+        }
+        Cmd::Ensemble {
+            rows,
+            out,
+            model,
+            test,
+            iterations,
+            lambda,
+        } => {
+            let mut members = Vec::new();
+            for p in &rows {
+                let name = p
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| p.display().to_string());
+                members.push((name, jev_rs::ensemble::load_rows(p)?));
+            }
+            match model {
+                Some(mp) => {
+                    let v = jev_rs::ensemble::apply_report(&mp, &members)?;
+                    println!("{}", serde_json::to_string_pretty(&v).unwrap());
+                }
+                None => {
+                    let (mut report, stacker) =
+                        jev_rs::ensemble::fit_report(&members, test, iterations, lambda)?;
+                    stacker.save(&out)?;
+                    report.model = Some(out.display().to_string());
+                    println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                }
+            }
             Ok(())
         }
     }

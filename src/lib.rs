@@ -7,6 +7,7 @@
 //! typed answer; [`judge::Judge`] ties it together; [`server`] speaks HTTP.
 
 pub mod backend;
+pub mod ensemble;
 pub mod eval;
 pub mod full_eval;
 pub mod judge;

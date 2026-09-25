@@ -138,6 +138,7 @@ export TYPESAFE_BASE_URL=http://127.0.0.1:8090 TYPESAFE_API_KEY=local
 | `jev ask` | one request from flags, `--file`, or stdin; `--compare` also hits the hosted API |
 | `jev eval cases.jsonl` | accuracy, Brier, top-label ECE, coverage at ≤5 % error, latency, token cost |
 | `jev calibrate cases.jsonl` | fit per-bucket temperatures, write `calibration.json` (load with `--calibration`) |
+| `jev ensemble --rows a.jsonl --rows b.jsonl` | stack two or more backends' `eval --rows` files into one meta-predictor |
 
 Case-file line: `{"state": ..., "questions": {...}, "gold": {"id": "key-or-level"}}`.
 
@@ -271,6 +272,41 @@ to win. Pick by traffic:
 - open-ended or changing questions → the default `llamacpp` / `openai`
   logprob path
 
+### Stacking: `jev ensemble`
+
+Members' logits never transfer across models — the logprobs of model X only
+exist in X's own vocabulary and hidden-state geometry. What *can* be reused
+is the probability vector over the shared option labels, so `jev ensemble`
+takes each member's `jev eval --rows` file, aligns the questions, and fits a
+multinomial logistic **stacker** (the meta-predictor: given X's readout,
+guess what Y would have said) on a case-level train split — no case leaks
+across the split. The held-out test split is reported next to every member
+and the uniform average, through the same `eval::metrics` harness:
+
+```sh
+jev eval examples/dev_tasks.jsonl --rows dev.rows.jsonl                       # per backend
+jev ensemble --rows dev.rows.jsonl --rows laya.rows.jsonl --rows jev.rows.jsonl \
+             --out ensemble.json
+jev ensemble --model ensemble.json --rows dev.rows.jsonl --rows …             # apply later
+```
+
+| Typed Decisions test, 540 held-out questions | accuracy | Brier | ECE |
+|---|---|---|---|
+| llamacpp Qwen3-4B (logprob path) | 0.548 | 0.540 | 0.082 |
+| Laya typed-decisions | 0.778 | 0.301 | 0.038 |
+| AgentJev-0.6B | 0.811 | **0.264** | **0.018** |
+| uniform average of the three | 0.800 | 0.299 | 0.125 |
+| **stacker (all three)** | **0.822** | **0.253** | 0.043 |
+
+The stacker beats every individual member on accuracy and Brier — the
+generalist's probability vector carries signal the two specialists lack
+(0.548 alone, yet the ensemble is above the best specialist). On
+`dev_tasks.jsonl` — 12 test questions, llamacpp at 0.833 — no ensemble can
+beat a member that is already right four times out of five on that tiny
+split; the win needs the larger bench. Members run in parallel, so the
+stacker's latency is the *sum* of member latencies (reported as such), and
+`fit` runs on the train split only — no optimistic in-sample numbers.
+
 ## The ecosystem, and where jev-rs sits
 
 Open Jev solutions cluster into three groups. Wire compatibility matters
@@ -324,7 +360,8 @@ poorjev), or hosted (Jev, djev). jev-rs is the only project that is all of:
 - **one measurement stack** — `jev eval` / `jev calibrate` report accuracy,
   Brier, top-label ECE, coverage and latency for *every* backend, which is
   how the two comparison tables above were produced, and an MCP server so
-  coding agents get the same judgments in-session.
+  coding agents get the same judgments in-session; `jev ensemble` then stacks
+  any of them into a single meta-predictor that beats its best member.
 
 In short: the ecosystem offers interchangeable parts; jev-rs is the
 chassis that mounts them and the dyno that measures them.
