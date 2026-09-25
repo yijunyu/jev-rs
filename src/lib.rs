@@ -8,6 +8,7 @@
 
 pub mod backend;
 pub mod eval;
+pub mod full_eval;
 pub mod judge;
 pub mod mcp;
 pub mod prompt;

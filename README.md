@@ -195,12 +195,84 @@ Hosted Jev has been independently measured at 236–276 ms p50 per request
 ([jev-benchmarks](https://github.com/AbdelStark/jev-benchmarks),
 [decision-model-benchmark](https://github.com/nibzard/decision-model-benchmark)).
 
+### Against the open alternatives
+
+Same `examples/dev_tasks.jsonl` (75 decisions, 0 failed), same machine,
+through `jev eval` so the metrics line up with the table above. The two
+open alternatives are wired as first-class backends:
+[Laya](https://huggingface.co/convaiinnovations/laya)
+(`--backend-kind laya`, `typed-decisions`) and
+[AgentJev](https://github.com/malevrigns/agent-jev)
+(`--backend-kind agentjev`, 0.6B). Both answer a whole request in one
+call; probabilities are converted to log-probs and scored with the same
+harness as the logprob path.
+
+| metric | jev-rs (Qwen3-4B raw logprobs) | [Laya](https://huggingface.co/convaiinnovations/laya) typed-decisions | [AgentJev](https://github.com/malevrigns/agent-jev)-0.6B |
+|---|---|---|---|
+| accuracy overall | **0.71** | 0.49 | 0.49 |
+| accuracy: choice / noul / score | **0.92 / 0.64 / 0.56** | 0.68 / 0.40 / 0.40 | 0.64 / 0.40 / 0.44 |
+| Brier raw | **0.510** | 0.586 | 0.754 |
+| Brier after `jev calibrate` | — | **0.510** | 0.571 |
+| ECE raw | 0.244 | **0.102** | 0.285 |
+| ECE after fit | — | **0.098** | **0.095** |
+| latency p50 per request (warm) | ~90 ms | **~45 ms** | ~2 360 ms |
+
+Neither specialist beats the logprob path on accuracy here: both sit near
+chance on `noul` and `score`. Laya is about 2× faster and, after a
+per-bucket temperature fit, has the best ECE of the three — useful if you
+only care about calibrated confidence on its own traffic. AgentJev is
+~25× slower on this CPU host and worst on raw Brier; its fitted ECE is
+fine, but accuracy stays at chance. Keep the default `llamacpp`/`openai`
+path for judgments; use `--backend-kind laya` or `--backend-kind agentjev`
+when you specifically want those models.
+
+### Reciprocal: Typed Decisions test split
+
+The same three backends, scored on *their* home bench —
+[Typed Decisions](https://huggingface.co/datasets/LocalLLaMA/typed-decisions)
+`test` (400 cases / 2 000 decisions, revision `ea930645…`) — converted to
+jev-rs case JSONL and run through `jev eval`. Datasets differ from the table
+above; each bench favors the model trained on it.
+
+| metric | jev-rs (Qwen3-4B raw logprobs) | Laya typed-decisions | AgentJev-0.6B |
+|---|---|---|---|
+| accuracy overall | 0.539 | 0.766 | **0.796** |
+| accuracy: choice / noul / score | 0.58 / 0.56 / 0.50 | 0.73 / 0.86 / 0.72 | **0.76 / 0.88 / 0.76** |
+| Brier raw | 0.878 | 0.400 | **0.321** |
+| Brier after `jev calibrate`† | — | 0.314 | **0.287** |
+| ECE raw | 0.425 | 0.213 | **0.134** |
+| ECE after fit† | — | 0.024 | **0.018** |
+| latency p50 (warm) | ~99 ms/question | ~237 ms/case | ~2 687 ms/case |
+
+† Fit is done on the same rows `jev eval` reports (optimistic); treat as a
+ceiling, not a held-out calibration number. Laya and AgentJev answers are
+whole-case wall time (5 decisions per case); the llamacpp column is
+per-question next-token scoring.
+
+The two tables are one conclusion, not a contradiction. Laya and AgentJev
+are **specialists**: they only know the 20 fixed Typed Decisions schemas
+they were trained on. On their home bench they win (0.77 / 0.80 vs 0.54);
+on `dev_tasks.jsonl` — shell-command questions they have never seen — they
+fall to chance (0.49 each). Qwen3-4B through raw logprobs is a
+**generalist**: zero-shot on any schema. It wins `dev_tasks` (0.71) and
+sits near the Typed Decisions prior baseline (0.54) when cold against a
+model fitted to that exact data. This is the specialist-vs-generalist
+split Typed Decisions itself documents — each path wins where it was built
+to win. Pick by traffic:
+
+- fixed, known schema with a trained checkpoint → `--backend-kind laya`
+  or `--backend-kind agentjev`
+- open-ended or changing questions → the default `llamacpp` / `openai`
+  logprob path
+
 ## Why another one
 
 Open Jev replacements appeared within a week of the launch
 ([Laya](https://huggingface.co/convaiinnovations/laya),
+[AgentJev](https://github.com/malevrigns/agent-jev),
 [jeff](https://github.com/lodos3/jeff),
-[jev-bridge](https://github.com/TOSUKUi/jev-bridge)). jev-rs is built to
+[jev-bridge](https://github.com/TOSUKUi/jev-bridge)).
+jev-rs is built to
 be the judgment engine inside two Rust systems —
 [PRECC](https://github.com/peri-a-i/precc-cc), a Claude Code hook that
 saves tokens, and [ds4-rs-metal](https://github.com/yijunyu/ds4-rs-metal) /
