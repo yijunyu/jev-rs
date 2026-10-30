@@ -52,7 +52,7 @@ jev --backend http://127.0.0.1:8089 ask \
 ```
 
 Set `JEV_BACKEND_URL` once to drop the `--backend` flag. Use
-`--template gemma|llama3|raw` for non-ChatML models.
+`--template gemma|gemma4|llama3|raw` for non-ChatML models (`gemma` is Gemma 2 and 3; Gemma 4 uses `gemma4`).
 
 **Hosted or OpenAI-compatible backends.** `--backend-kind openai` scores
 through `chat/completions` with `logprobs` (`max_tokens: 1`,

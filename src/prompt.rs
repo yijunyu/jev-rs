@@ -13,8 +13,12 @@ pub enum Template {
     /// `<|im_start|>` ChatML (Qwen, DeepSeek-V4 via ChatML, many fine-tunes).
     /// Includes an empty `<think>` block so Qwen3 does not reason first.
     ChatMl,
-    /// Gemma `<start_of_turn>` template.
+    /// Gemma 2 and 3 `<start_of_turn>` template.
     Gemma,
+    /// Gemma 4 `<|turn>` template. No system turn: with one, Gemma 4's own
+    /// template switches thinking on (`<|think|>`), so the instructions go in
+    /// the user turn, as for Gemma 2 and 3.
+    Gemma4,
     /// Llama 3 header template.
     Llama3,
     /// No template: plain text, for base models.
@@ -26,11 +30,12 @@ impl std::str::FromStr for Template {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "chatml" | "qwen" | "deepseek" => Ok(Self::ChatMl),
-            "gemma" => Ok(Self::Gemma),
+            "gemma" | "gemma3" => Ok(Self::Gemma),
+            "gemma4" => Ok(Self::Gemma4),
             "llama3" | "llama" => Ok(Self::Llama3),
             "raw" | "base" | "none" => Ok(Self::Raw),
             other => Err(format!(
-                "unknown template `{other}` (chatml|gemma|llama3|raw)"
+                "unknown template `{other}` (chatml|gemma|gemma4|llama3|raw)"
             )),
         }
     }
@@ -72,6 +77,7 @@ pub fn prefix(template: Template, state_text: &str) -> String {
             format!("<|im_start|>system\n{SYSTEM}<|im_end|>\n<|im_start|>user\n{body}")
         }
         Template::Gemma => format!("<start_of_turn>user\n{SYSTEM}\n\n{body}"),
+        Template::Gemma4 => format!("<|turn>user\n{SYSTEM}\n\n{body}"),
         Template::Llama3 => format!(
             "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{SYSTEM}<|eot_id|>\
 <|start_header_id|>user<|end_header_id|>\n\n{body}"
@@ -84,6 +90,7 @@ fn close(template: Template) -> &'static str {
     match template {
         Template::ChatMl => "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nAnswer:",
         Template::Gemma => "<end_of_turn>\n<start_of_turn>model\nAnswer:",
+        Template::Gemma4 => "<turn|>\n<|turn>model\nAnswer:",
         Template::Llama3 => "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nAnswer:",
         Template::Raw => "\nAnswer:",
     }
@@ -200,5 +207,17 @@ mod tests {
         assert!(r.suffix.contains("B) x"));
         assert!(r.suffix.contains("C) y: why"));
         assert!(r.prompt().ends_with("Answer:"));
+    }
+
+    #[test]
+    fn gemma4_wraps_in_turn_markers() {
+        let q: Question =
+            serde_json::from_value(json!({"type":"noul","instructions":"Ok?"})).unwrap();
+        assert_eq!("gemma4".parse::<Template>(), Ok(Template::Gemma4));
+        let p = prefix(Template::Gemma4, "s");
+        let r = render(Template::Gemma4, &p, &q, None);
+        assert!(r.prompt().starts_with("<|turn>user\n"));
+        assert!(r.prompt().ends_with("<turn|>\n<|turn>model\nAnswer:"));
+        assert!(!r.prompt().contains("<|think|>"));
     }
 }

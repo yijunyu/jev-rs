@@ -49,7 +49,7 @@ struct Cli {
     /// Extra JSON merged into openai requests, e.g. '{"thinking":{"type":"disabled"}}'.
     #[arg(long, env = "JEV_EXTRA")]
     extra: Option<String>,
-    /// Chat template of the backend model: chatml | gemma | llama3 | raw
+    /// Chat template of the backend model: chatml | gemma | gemma4 | llama3 | raw
     #[arg(long, env = "JEV_TEMPLATE", default_value = "chatml")]
     template: String,
     /// JSON file with per-bucket temperatures (from `jev calibrate`).
